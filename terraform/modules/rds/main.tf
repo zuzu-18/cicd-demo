@@ -42,7 +42,7 @@ resource "aws_db_instance" "this" {
   publicly_accessible    = false
   deletion_protection    = false
   skip_final_snapshot    = true
-  backup_retention_period = 7
+  backup_retention_period = 0
   tags = { Name = "${var.name}-postgres" }
 }
 

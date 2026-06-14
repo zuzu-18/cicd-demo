@@ -139,10 +139,10 @@ resource "aws_ecs_service" "this" {
   name            = "${var.name}-service"
   cluster         = aws_ecs_cluster.this.id
   task_definition = aws_ecs_task_definition.this.arn
-  desired_count   = 2
+  desired_count   = 1
 
   deployment_controller {
-    type = "CODE_DEPLOY"
+    type = "ECS"
   }
 
   network_configuration {
@@ -158,7 +158,7 @@ resource "aws_ecs_service" "this" {
   }
 
   lifecycle {
-    ignore_changes = [task_definition, load_balancer]
+    ignore_changes = [task_definition]
   }
 }
 

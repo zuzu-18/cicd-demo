@@ -104,25 +104,39 @@ resource "aws_cloudwatch_dashboard" "main" {
   dashboard_body = jsonencode({
     widgets = [
       {
-        type = "metric"
+        type   = "metric"
+        x      = 0
+        y      = 0
+        width  = 12
+        height = 6
         properties = {
-          title  = "ECS CPU & Memory"
-          period = 60
+          title   = "ECS CPU & Memory"
+          region  = var.aws_region
+          period  = 60
           metrics = [
             ["AWS/ECS", "CPUUtilization", "ClusterName", module.ecs.cluster_name, "ServiceName", module.ecs.service_name],
             ["AWS/ECS", "MemoryUtilization", "ClusterName", module.ecs.cluster_name, "ServiceName", module.ecs.service_name],
           ]
+          view    = "timeSeries"
+          stat    = "Average"
         }
       },
       {
-        type = "metric"
+        type   = "metric"
+        x      = 12
+        y      = 0
+        width  = 12
+        height = 6
         properties = {
-          title  = "ALB Requests & 5xx Errors"
-          period = 60
+          title   = "ALB Requests & 5xx Errors"
+          region  = var.aws_region
+          period  = 60
           metrics = [
             ["AWS/ApplicationELB", "RequestCount", "LoadBalancer", module.alb.alb_arn_suffix],
             ["AWS/ApplicationELB", "HTTPCode_ELB_5XX_Count", "LoadBalancer", module.alb.alb_arn_suffix],
           ]
+          view    = "timeSeries"
+          stat    = "Sum"
         }
       }
     ]
