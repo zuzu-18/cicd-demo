@@ -12,6 +12,7 @@ env:
   ECS_CLUSTER: cicd-demo-prod-cluster
   ECS_SERVICE: cicd-demo-prod-service
   CONTAINER_NAME: app
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   test:
@@ -26,6 +27,7 @@ jobs:
         with:
           go-version: '1.22'
           cache: true
+          cache-dependency-path: app/go.sum
 
       - name: Run tests
         working-directory: app
