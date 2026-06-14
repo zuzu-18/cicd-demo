@@ -180,3 +180,50 @@ output "ecr_repo_url" {
   value       = aws_ecr_repository.app.repository_url
   description = "Use this in GitHub Actions"
 }
+# Metric filter — count error level log lines
+resource "aws_cloudwatch_log_metric_filter" "errors" {
+  name           = "${var.project}-error-count"
+  log_group_name = "/ecs/${var.project}-${var.environment}"
+  pattern        = "{ $.level = \"error\" }"
+
+  metric_transformation {
+    name      = "ErrorCount"
+    namespace = "${var.project}/app"
+    value     = "1"
+    unit      = "Count"
+  }
+}
+
+# Alarm — fires if more than 5 errors in 5 minutes
+resource "aws_cloudwatch_metric_alarm" "error_rate" {
+  alarm_name          = "${var.project}-error-rate"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "ErrorCount"
+  namespace           = "${var.project}/app"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 5
+  alarm_description   = "App error rate exceeded 5 errors in 5 minutes"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+}
+
+# Alarm — ALB 5xx errors
+resource "aws_cloudwatch_metric_alarm" "alb_5xx" {
+  alarm_name          = "${var.project}-alb-5xx"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "HTTPCode_ELB_5XX_Count"
+  namespace           = "AWS/ApplicationELB"
+  period              = 60
+  statistic           = "Sum"
+  threshold           = 10
+  alarm_description   = "ALB returning more than 10 5xx errors per minute"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+
+  dimensions = {
+    LoadBalancer = module.alb.alb_arn_suffix
+  }
+}

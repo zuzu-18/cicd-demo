@@ -27,6 +27,19 @@ type ItemResponse struct {
 
 var db *sql.DB
 
+func logJSON(level, msg string, fields map[string]string) {
+	entry := map[string]string{
+		"level":   level,
+		"message": msg,
+		"time":    time.Now().UTC().Format(time.RFC3339),
+	}
+	for k, v := range fields {
+		entry[k] = v
+	}
+	b, _ := json.Marshal(entry)
+	log.Println(string(b))
+}
+
 func connectDB() {
 	dsn := fmt.Sprintf(
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=require",
@@ -40,7 +53,7 @@ func connectDB() {
 	var err error
 	db, err = sql.Open("postgres", dsn)
 	if err != nil {
-		log.Printf("Warning: could not open DB: %v", err)
+		logJSON("error", "could not open DB", map[string]string{"error": err.Error()})
 		return
 	}
 
@@ -49,9 +62,9 @@ func connectDB() {
 	db.SetConnMaxLifetime(5 * time.Minute)
 
 	if err = db.Ping(); err != nil {
-		log.Printf("Warning: could not ping DB: %v", err)
+		logJSON("error", "could not ping DB", map[string]string{"error": err.Error()})
 	} else {
-		log.Println("Database connected successfully")
+		logJSON("info", "database connected", nil)
 		initSchema()
 	}
 }
@@ -65,8 +78,34 @@ func initSchema() {
 		)
 	`)
 	if err != nil {
-		log.Printf("Warning: schema init failed: %v", err)
+		logJSON("error", "schema init failed", map[string]string{"error": err.Error()})
+	} else {
+		logJSON("info", "schema ready", nil)
 	}
+}
+
+func loggingMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		rw := &responseWriter{ResponseWriter: w, status: 200}
+		next(rw, r)
+		logJSON("info", "request", map[string]string{
+			"method":   r.Method,
+			"path":     r.URL.Path,
+			"status":   fmt.Sprintf("%d", rw.status),
+			"duration": time.Since(start).String(),
+		})
+	}
+}
+
+type responseWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (rw *responseWriter) WriteHeader(code int) {
+	rw.status = code
+	rw.ResponseWriter.WriteHeader(code)
 }
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
@@ -144,10 +183,10 @@ func getEnv(key, fallback string) string {
 func main() {
 	connectDB()
 	mux := http.NewServeMux()
-	mux.HandleFunc("/health", healthHandler)
-	mux.HandleFunc("/items", itemsHandler)
+	mux.HandleFunc("/health", loggingMiddleware(healthHandler))
+	mux.HandleFunc("/items", loggingMiddleware(itemsHandler))
 	port := getEnv("PORT", "8080")
-	log.Printf("Server starting on :%s", port)
+	logJSON("info", "server starting", map[string]string{"port": port})
 	srv := &http.Server{
 		Addr:         ":" + port,
 		Handler:      mux,
@@ -156,6 +195,6 @@ func main() {
 		IdleTimeout:  30 * time.Second,
 	}
 	if err := srv.ListenAndServe(); err != nil {
-		log.Fatal(err)
+		logJSON("error", "server failed", map[string]string{"error": err.Error()})
 	}
 }
